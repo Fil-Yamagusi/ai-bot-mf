@@ -19,11 +19,11 @@ def count_tokens(text):
     return len(tokenizer.encode(text))
 
 
+# Получение ответа от языковой модели
 def get_resp(
         system_content,
         assistant_content,
         user_data_uid: dict):
-
     return requests.post(
         'http://localhost:1234/v1/chat/completions',
         headers={"Content-Type": "application/json"},
@@ -38,7 +38,7 @@ def get_resp(
                  "content": assistant_content +
                             user_data_uid['answer']},
             ],
-            "temperature": 0.8,
-            "max_tokens": 125
+            "temperature": 0.9,
+            "max_tokens": 100
         }
     )
