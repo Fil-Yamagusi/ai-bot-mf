@@ -39,6 +39,6 @@ def get_resp(
                             user_data_uid['answer']},
             ],
             "temperature": 0.8,
-            "max_tokens": 50
+            "max_tokens": 125
         }
     )

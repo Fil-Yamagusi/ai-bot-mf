@@ -8,10 +8,10 @@ Fil FC AI multi-functional
 @fil_fc_ai_mf_bot
 https://t.me/fil_fc_ai_mf_bot
 """
-__version__ = '0.2'
+__version__ = '0.3'
 __author__ = 'Firip Yamagusi'
 
-from time import strftime
+from time import time, strftime
 
 import logging
 from telebot import TeleBot
@@ -91,28 +91,29 @@ markup = ReplyKeyboardMarkup(
 markup.add(*["more", "break", ])
 
 user_data = {}
-max_tokens_in_task = 35
+max_tokens_in_task = 50
 
 
 # Часто придётся извиняться за медленный сервер
-def send_please_be_patient_message(uid):
+def send_please_be_patient_message(user_id):
     bot.send_message(
-        uid, '🙏🏻 <b>This GPT model is very slow, please be patient</b>',
+        user_id, '🙏🏻 <b>Я медленная языковая модель, запаситесь терпением</b>',
         parse_mode="HTML")
 
 
 # Проверка наличия записи для данного пользователя
-def check_user(uid):
+def check_user(user_id):
     global user_data
-    if uid not in user_data:
-        logging.warning(f"Пользователь создан: uid={uid}")
-        user_data[uid] = {}
-        user_data[uid]['category'] = "История"
-        user_data[uid]['level'] = "Школяр"
-        user_data[uid]['debug'] = []
-        user_data[uid]['task'] = ""
-        user_data[uid]['answer'] = ""
-        user_data[uid]['busy'] = False
+    if user_id not in user_data:
+        logging.warning(f"Пользователь создан: user_id={user_id}")
+        user_data[user_id] = {}
+        user_data[user_id]['category'] = "История"
+        user_data[user_id]['level'] = "Школяр"
+        user_data[user_id]['task'] = ""
+        user_data[user_id]['answer'] = ""
+        user_data[user_id]['busy'] = False
+        user_data[user_id]['t_start'] = 0
+        user_data[user_id]['t_result'] = 0
 
 
 # Обработчик команды /start
@@ -157,7 +158,7 @@ def set_settings(m: Message):
     check_user(user_id)
     if m.text not in Categories and m.text not in Levels:
         logging.warning(
-            f"Пользователь uid={user_id} не смог изменить настройки")
+            f"Пользователь user_id={user_id} не смог изменить настройки")
         bot.send_message(
             user_id,
             'Ошибка: нет такого уровня или категории. Попробуйте ещё раз',
@@ -201,19 +202,16 @@ def handle_help(m: Message):
 def handle_start(m: Message):
     user_id = m.from_user.id
     check_user(user_id)
-    error_log = "is empty now"
-    if user_data[user_id]['debug']:
-        error_log = "\n".join(user_data[user_id]['debug'])
 
     try:
         with open(log_file, "rb") as f:
             bot.send_document(user_id, f)
     except Exception:
         logging.error(
-            f"Не получилось отправить лог-файл пользователю uid={user_id}")
+            f"{user_id}: Не получилось отправить лог-файл пользователю")
         bot.send_message(
             user_id,
-            f'Cannot find log file',
+            f'Не могу найти лог-файл',
             reply_markup=hideKeyboard)
 
 
@@ -230,35 +228,36 @@ def handle_ask_gpt(m: Message):
         user_data[user_id]['task'] = ""
         user_data[user_id]['answer'] = ""
         user_data[user_id]['busy'] = False
-        err_msg = strftime("%F %T") + ": BREAK for some reason"
-        user_data[user_id]['debug'].append(err_msg)
+        err_msg = f"{user_id}: пользователь запросил BREAK"
+        logging.warning(err_msg)
         bot.send_message(
             user_id,
-            'Something went wrong!\n'
-            'Wait for a while and try another task.')
+            'Что-то пошло не так!\n'
+            'Подождите секундочку и сформулируйте новый запрос.')
         return
 
     # Чтобы не спамил запросами
     if user_data[user_id]['busy']:
-        err_msg = strftime("%F %T") + ": SPAM detected"
-        user_data[user_id]['debug'].append(err_msg)
+        err_msg = f"{user_id}: слишком частые запросы"
+        logging.warning(err_msg)
         bot.send_message(
             user_id,
-            f"❎ Please, don't spam! This task will be ignored.")
+            f"❎ Пожалуйста, подождите результата текущего запроса.\n "
+            f"(начат {time() - user_data[user_id]['t_start']:0.2f} сек назад)")
         return
 
     # Ругаемся, если слишком много токенов в запросе
     try:
         if count_tokens(m.text) > max_tokens_in_task:
-            err_msg = strftime("%F %T") + ": prompt is too long"
-            user_data[user_id]['debug'].append(err_msg)
+            err_msg = f"{user_id}: запрос слишком длинный"
+            logging.warning(err_msg)
             bot.send_message(
                 user_id,
-                'ℹ️ Your prompt is too long. Please try again.')
+                'ℹ️ GPT сложно обработать длинный запрос. Укоротите его.')
             return
     except Exception as e:
-        err_msg = strftime("%F %T") + ": error while using count_tokens()"
-        user_data[user_id]['debug'].append(err_msg)
+        err_msg = f"{user_id}: ошибка функции, вычисляющей токены"
+        logging.warning(err_msg)
         bot.send_message(
             user_id,
             f'❎ Error: {e}')
@@ -268,22 +267,22 @@ def handle_ask_gpt(m: Message):
     if m.text.lower() in ["more", "continue", "/more", "/continue"]:
         if not user_data[user_id]['task']:
             err_msg = strftime("%F %T") + ": asked for more while task is empty"
-            user_data[user_id]['debug'].append(err_msg)
+            logging.warning(err_msg)
             bot.send_message(
                 user_id,
-                f'You asked for more? There is no task!',
+                f'Продолжить? Но у меня сейчас нет задач!',
                 parse_mode="HTML")
             return
         else:
             bot.send_message(
                 user_id,
-                '...I will continue...')
+                '...продолжаю...')
     else:
         user_data[user_id]['task'] = m.text
         user_data[user_id]['answer'] = ""
         bot.send_message(
             user_id,
-            f'New task: <i>{user_data[user_id]['task']}</i>',
+            f'Моя задача: <i>{user_data[user_id]['task']}</i>',
             parse_mode="HTML")
 
     user_data[user_id]['busy'] = True
@@ -292,35 +291,39 @@ def handle_ask_gpt(m: Message):
     send_please_be_patient_message(user_id)
 
     # Проверенный кусок кода API GPT в консоли
+    user_data[user_id]['t_start'] = time()
     resp = get_resp(
         system_content[user_data[user_id]['category']],
         assistant_content[user_data[user_id]['level']],
         user_data[user_id]
     )
+    user_data[user_id]['t_result'] = time() - user_data[user_id]['t_start']
 
     # Обрабатываем ответ на случай ошибок
     if resp.status_code == 200 and 'choices' in resp.json():
         result = resp.json()['choices'][0]['message']['content']
         if result == "":
-            err_msg = strftime("%F %T") + ": model returned an empty string"
-            user_data[user_id]['debug'].append(err_msg)
+            err_msg = f"{user_id}: GPT вернула пустую строку"
+            logging.error(err_msg)
             bot.send_message(
                 user_id,
-                'ℹ️ I have said enough.')
+                'ℹ️ Ответ закончен (модель вернула пустую строку)')
         # Вот в этой веточке успешный результат - показываем в телеграме
         else:
             user_data[user_id]['answer'] += result
             bot.send_message(
                 user_id,
-                result,
+                f"[{user_data[user_id]['t_result']:.2f} сек]\n\n"
+                f"{result.strip()}" ,
+                parse_mode="HTML",
                 reply_markup=markup)
     else:
-        err_msg = strftime("%F %T") + ": GPT is not avaliable now"
-        user_data[user_id]['debug'].append(err_msg)
+        err_msg = f"{user_id}: GPT не отвечает на запросы. Попробуйте break"
+        logging.error(err_msg)
         bot.send_message(
             user_id,
-            f'GPT is not avaliable now.\n'
-            f'Error message: <b>{resp.json()}</b>',
+            f'{err_msg}.\n'
+            f'Ошибка: <b>{resp.json()}</b>',
             parse_mode="HTML")
 
     user_data[user_id]['busy'] = False
