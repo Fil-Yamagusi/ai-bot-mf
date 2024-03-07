@@ -6,7 +6,6 @@ README.md for more
 
 GPT-functions
 """
-
 import requests
 from transformers import AutoTokenizer
 

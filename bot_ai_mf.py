@@ -8,7 +8,7 @@ Fil FC AI multi-functional
 @fil_fc_ai_mf_bot
 https://t.me/fil_fc_ai_mf_bot
 """
-__version__ = '0.3'
+__version__ = '0.333'
 __author__ = 'Firip Yamagusi'
 
 from time import time, strftime

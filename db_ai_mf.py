@@ -6,7 +6,6 @@ README.md for more
 
 SQLite DB functions
 """
-
 import sqlite3
 
 
@@ -148,7 +147,7 @@ def get_stat(db_connection, type):
     cursor = db_connection.cursor()
 
     # Простая инфа про пользователей
-    if type=='users':
+    if type == 'users':
         ds = {}
         try:
             total = 0
@@ -185,7 +184,7 @@ def get_stat(db_connection, type):
         return ds
 
     # Простая инфа про запросы
-    if type=='tasks':
+    if type == 'tasks':
         ds = {}
         try:
             total = 0
