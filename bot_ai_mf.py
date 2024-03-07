@@ -12,6 +12,7 @@ __version__ = '0.3'
 __author__ = 'Firip Yamagusi'
 
 from time import time, strftime
+from random import choice
 
 import logging
 from telebot import TeleBot
@@ -20,7 +21,7 @@ from telebot.types import ReplyKeyboardMarkup, ReplyKeyboardRemove, Message
 from config import TOKEN_MF
 from gpt_ai_mf import count_tokens, get_resp
 from db_ai_mf import create_db, create_user, update_user
-from db_ai_mf import create_task, update_task
+from db_ai_mf import create_task, update_task, get_stat
 
 bot_name = "Fil FC AI multi-functional | @fil_fc_ai_mf_bot"
 
@@ -35,7 +36,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     datefmt="%F %T",
     filename=log_file,
-    filemode="w",
+    filemode="a",
 )
 
 logging.warning(f"Бот {bot_name} запущен")
@@ -128,9 +129,11 @@ def check_user(user_id):
         user_data[user_id]['busy'] = False
         user_data[user_id]['t_start'] = 0
         user_data[user_id]['t_result'] = 0
-        create_user(db_conn, user_data[user_id])
-        logging.warning(f"Пользователь создан: user_id={user_id}")
-        update_user(db_conn, user_data[user_id])
+        if create_user(db_conn, user_data[user_id]):
+            logging.warning(f"Пользователь создан: user_id={user_id}")
+        else:
+            update_user(db_conn, user_data[user_id])
+            logging.warning(f"Пользователь обновлён: user_id={user_id}")
 
 
 # Обработчик команды /start
@@ -228,6 +231,7 @@ def handle_help(m: Message):
 def handle_start(m: Message):
     user_id = m.from_user.id
     check_user(user_id)
+    logging.warning(f"{user_id}: Любопытный пользователь запросил лог")
 
     try:
         with open(log_file, "rb") as f:
@@ -239,6 +243,85 @@ def handle_start(m: Message):
             user_id,
             f'Не могу найти лог-файл',
             reply_markup=hideKeyboard)
+
+
+# Часть домашнего задания - вывод статистики
+@bot.message_handler(commands=['stat'])
+def handle_stat(m: Message):
+    user_id = m.from_user.id
+    check_user(user_id)
+    logging.warning(f"{user_id}: Любопытный пользователь запросил статистику")
+
+    bot.send_message(
+        user_id,
+        f'<b>СТАТИСТИКА ИСПОЛЬЗОВАНИЯ БОТА</b>',
+        parse_mode="HTML")
+
+    # Простая инфа про пользователей
+    ds = get_stat(db_conn, type='users')
+    users_by_level = [(f"- на уровне <b>{lvl}</b>: "
+                       f"{ds['levels'][lvl]}") for lvl in ds['levels']]
+    bot.send_message(
+        user_id,
+        f'👨‍👩‍👦‍👦 Всего пользователей: <b>{ds["total"]}</b>, в т.ч.:\n\n'
+        f'{"\n".join(users_by_level)}',
+        parse_mode="HTML")
+
+    top_users = [(f"- <b>uid={uid}</b>: "
+                       f"{ds['uids'][uid]} шт.") for uid in ds['uids']]
+    bot.send_message(
+        user_id,
+        f'🏆 Топ-3 пользователей по запросам:\n\n'
+        f'{"\n".join(top_users)}',
+        parse_mode="HTML")
+
+    # Простая инфа про запросы
+    ds = get_stat(db_conn, type='tasks')
+    tasks_by_level = [(f"- на уровне <b>{lvl}</b>: "
+                       f"{ds['levels'][lvl]}") for lvl in ds['levels']]
+    tasks_by_category = [(f"- в категориии <b>{cat}</b>: "
+                          f"{ds['category'][cat]}") for cat in ds['category']]
+    tasks_by_hours = [(f"- час <b>{h}</b>: "
+                          f"{ds['hour'][h]}") for h in ds['hour']]
+    bot.send_message(
+        user_id,
+        f'📊 Всего запросов: <b>{ds["total"]}</b>, в т.ч.:\n\n'
+        f'{"\n".join(tasks_by_level)}\n\n'
+        f'{"\n".join(tasks_by_category)}\n\n'
+        f'{"\n".join(tasks_by_hours)}\n\n',
+        parse_mode="HTML")
+
+    rnd_rzhaka = [
+        "Как выглядят птенцы голубей?",
+        "Кто написал роман 'Мстители: война без конечностей'?",
+        "Зачем у Акинфеева татуировка Репина на ноге?",
+        "Какие писатели-близнецы по гороскопу Близнецы?",
+        "Кто был толще: Лев Толстой или Алексей Толстой?",
+        "Мода на женские усики при Елизавете Петровне",
+        "Какой краской нарисовать Луну, чтобы светилась",
+        "Лучший стих немецкого поэта, который карлик был",
+        "Площадь самой большой картины в Третьяковке",
+        "Альтернативные концовки дуэли Онегина и Ленского",
+        "Как правильно писать: ИЮНЬ или ИЮЛЬ?",
+        "Рецепт запрещённого верескового мёда",
+        "Составь гороскоп для дядьки Черномора",
+        "Как ныне собирает свои вещи Олег?",
+        "Взлом ВК без платно быстро надо русичка дура",
+        "В какой серии Поттер целовал жабу",
+        "Почему у Рубенса все в складочку?",
+        "Зачем эпитеты в эпиграфе на эпитафии",
+        "Подбери антоним к антониму",
+        "Почему валет червей похож на короля пик?",
+        "Левитан и Левитан - родственники?",
+        "Красная Шапочка в оригинале умерла?",
+        "Придумай запрос сразу в три категории: история, литература и живопись",
+    ]
+    bot.send_message(
+        user_id,
+        f'🤣 Самый смешной запрос:\n\n'
+        f'{choice(rnd_rzhaka)}',
+        parse_mode="HTML",
+        reply_markup=hideKeyboard)
 
 
 # Основная обработка входящих запросов
@@ -284,7 +367,7 @@ def handle_ask_gpt(m: Message):
             return
     except Exception as e:
         err_msg = f"{user_id}: ошибка функции, вычисляющей токены"
-        logging.warning(err_msg)
+        logging.error(err_msg)
         bot.send_message(
             user_id,
             f'❎ Error: {e}')
@@ -293,7 +376,7 @@ def handle_ask_gpt(m: Message):
     # Если просит продолжить ответ
     if m.text.lower() in ["more", "continue", "/more", "/continue"]:
         if not user_data[user_id]['task']:
-            err_msg = strftime("%F %T") + ": asked for more while task is empty"
+            err_msg = f"{user_id}: Запрос продолжения при пустой задаче"
             logging.warning(err_msg)
             bot.send_message(
                 user_id,
@@ -311,6 +394,8 @@ def handle_ask_gpt(m: Message):
         user_data[user_id]['current_task_id'] = (
             create_task(db_conn, user_data[user_id]))
         update_user(db_conn, user_data[user_id])
+        logging.warning(f"{user_id}: Новая задача "
+                        f"task_id={user_data[user_id]['current_task_id']}")
         bot.send_message(
             user_id,
             f'Новая задача: <i>{user_data[user_id]['task']}</i>',
@@ -336,7 +421,7 @@ def handle_ask_gpt(m: Message):
         result = result.strip()
         if result == "":
             err_msg = f"{user_id}: GPT вернула пустую строку"
-            logging.error(err_msg)
+            logging.warning(err_msg)
             bot.send_message(
                 user_id,
                 'ℹ️ Ответ закончен (модель вернула пустую строку)')
@@ -353,6 +438,7 @@ def handle_ask_gpt(m: Message):
     else:
         err_msg = f"{user_id}: GPT не отвечает на запросы. Попробуйте break"
         logging.error(err_msg)
+        logging.error(resp.json())
         bot.send_message(
             user_id,
             f'{err_msg}.\n'
