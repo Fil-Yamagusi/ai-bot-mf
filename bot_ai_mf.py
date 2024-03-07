@@ -14,6 +14,10 @@ __author__ = 'Firip Yamagusi'
 from time import time, strftime
 from random import choice
 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
+
 import logging
 from telebot import TeleBot
 from telebot.types import ReplyKeyboardMarkup, ReplyKeyboardRemove, Message
@@ -268,7 +272,7 @@ def handle_stat(m: Message):
         parse_mode="HTML")
 
     top_users = [(f"- <b>uid={uid}</b>: "
-                       f"{ds['uids'][uid]} шт.") for uid in ds['uids']]
+                  f"{ds['uids'][uid]} шт.") for uid in ds['uids']]
     bot.send_message(
         user_id,
         f'🏆 Топ-3 пользователей по запросам:\n\n'
@@ -282,14 +286,30 @@ def handle_stat(m: Message):
     tasks_by_category = [(f"- в категориии <b>{cat}</b>: "
                           f"{ds['category'][cat]}") for cat in ds['category']]
     tasks_by_hours = [(f"- час <b>{h}</b>: "
-                          f"{ds['hour'][h]}") for h in ds['hour']]
+                       f"{ds['hour'][h]}") for h in ds['hour']]
     bot.send_message(
         user_id,
         f'📊 Всего запросов: <b>{ds["total"]}</b>, в т.ч.:\n\n'
         f'{"\n".join(tasks_by_level)}\n\n'
-        f'{"\n".join(tasks_by_category)}\n\n'
-        f'{"\n".join(tasks_by_hours)}\n\n',
+        f'{"\n".join(tasks_by_category)}',
         parse_mode="HTML")
+
+    # Для понтов график с распределением запросов по часам
+    data = ds['hour']
+    courses = list(data.keys())
+    values = list(data.values())
+
+    fig = plt.figure(figsize=(10, 5))
+    ax = fig.gca()
+    ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+    # creating the bar plot
+    plt.bar(courses, values, color='maroon', width=0.4)
+
+    plt.xlabel("Часы")
+    plt.ylabel("Количество запросов")
+    plt.title("Распредление запросов по часам в течение дня за всё время")
+    plt.savefig('myplot.png')
+    bot.send_photo(user_id, photo=open('myplot.png', 'rb'))
 
     rnd_rzhaka = [
         "Как выглядят птенцы голубей?",

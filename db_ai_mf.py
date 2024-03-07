@@ -153,12 +153,12 @@ def get_stat(db_connection, type):
         try:
             total = 0
 
-            print("Количество пользователей и разбиение по уровням")
+            # print("Количество пользователей и разбиение по уровням")
             q = ("SELECT COUNT(*) as amount, level "
                  "FROM Users group by level")
             cursor.execute(q)
             res = cursor.fetchall()
-            print(f"{res=}")
+            # print(f"{res=}")
 
             ds['levels'] = {}
             for r in res:
@@ -166,21 +166,21 @@ def get_stat(db_connection, type):
                 ds['levels'][r[1]] = r[0]
             ds['total'] = total
 
-            print("Топ-3 пользователей по запросам")
+            # print("Топ-3 пользователей по запросам")
             q = ("SELECT COUNT(*) as amount, user_id "
                  "FROM Tasks group by user_id ORDER BY amount DESC LIMIT 3")
             cursor.execute(q)
             res = cursor.fetchall()
-            print(f"{res=}")
+            # print(f"{res=}")
 
             ds['uids'] = {}
             for r in res:
                 ds['uids'][r[1]] = r[0]
 
-            print("Успешно", ds)
+            # print("Успешно")
 
         except sqlite3.IntegrityError:
-            print("Ошибка")
+            print("Ошибка users")
 
         return ds
 
@@ -190,12 +190,12 @@ def get_stat(db_connection, type):
         try:
             total = 0
 
-            print("Количество запросов и разбиение по уровням")
+            # print("Количество запросов и разбиение по уровням")
             q = ("SELECT COUNT(*) as amount, level "
                  "FROM Tasks group by level")
             cursor.execute(q)
             res = cursor.fetchall()
-            print(f"{res=}")
+            # print(f"{res=}")
 
             ds['levels'] = {}
             for r in res:
@@ -203,33 +203,36 @@ def get_stat(db_connection, type):
                 ds['levels'][r[1]] = r[0]
             ds['total'] = total
 
-            print("Количество запросов и разбиение по категориям")
+            # print("Количество запросов и разбиение по категориям")
             q = ("SELECT COUNT(*) as amount, category "
                  "FROM Tasks group by category")
             cursor.execute(q)
             res = cursor.fetchall()
-            print(f"{res=}")
+            # print(f"{res=}")
 
             ds['category'] = {}
             for r in res:
                 ds['category'][r[1]] = r[0]
 
-            print("Количество запросов по часам в течение дня")
+            # print("Количество запросов по часам в течение дня")
             q = ("SELECT count(user_id) as amount, "
                  "strftime('%H', datetime(t_start, 'unixepoch', 'localtime')) "
                  "as H "
                  "FROM Tasks GROUP BY H ORDER BY H ASC")
             cursor.execute(q)
             res = cursor.fetchall()
-            print(f"{res=}")
+            # print(f"{res=}")
 
+            data_src = [f"{i:02}" for i in range(0, 24)]
             ds['hour'] = {}
+            for d in data_src:
+                ds['hour'][d] = 0
             for r in res:
                 ds['hour'][r[1]] = r[0]
 
-            print("Успешно", ds)
+            # print("Успешно")
 
         except sqlite3.IntegrityError:
-            print("Ошибка")
+            print("Ошибка tasks")
 
         return ds
